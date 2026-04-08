@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Galaxy Cleaner</string>
+
+    <!-- Navigation -->
+    <string name="nav_cleaner">Limpador</string>
+    <string name="nav_albums">Albums</string>
+    <string name="nav_macros">Macros</string>
+
+    <!-- Cleaner screen -->
+    <string name="storage_usage">Uso do Armazenamento</string>
+    <string name="cache">Cache</string>
+    <string name="temp_files">Temporarios</string>
+    <string name="free">Livre</string>
+    <string name="clean_options">O que limpar</string>
+    <string name="option_cache">Cache de aplicativos</string>
+    <string name="option_temp">Arquivos temporarios</string>
+    <string name="option_thumbnails">Miniaturas antigas</string>
+    <string name="option_empty_folders">Pastas vazias</string>
+    <string name="btn_clean">Limpar Agora</string>
+    <string name="cleaning_in_progress">Limpando…</string>
+    <string name="clean_complete">Limpeza concluida!</string>
+    <string name="freed_space">%s liberados</string>
+    <string name="items_removed">%d itens removidos</string>
+
+    <!-- Albums screen -->
+    <string name="search_albums">Buscar albums…</string>
+    <string name="album_photo_count">%d fotos</string>
+    <string name="no_albums">Nenhum album encontrado</string>
+    <string name="cancel_selection">Cancelar selecao</string>
+    <string name="select_all">Tudo</string>
+    <string name="hide_selected">Ocultar</string>
+    <string name="show_selected">Mostrar</string>
+    <string name="save_as_macro">Salvar macro</string>
+    <string name="create_macro">Nova macro</string>
+    <string name="albums_hidden">%d albums ocultados</string>
+    <string name="albums_shown">%d albums exibidos</string>
+    <string name="permission_required">Permissao necessaria para acessar suas fotos</string>
+    <string name="grant_permission">Conceder permissao</string>
+
+    <!-- Macros screen -->
+    <string name="saved_macros">Macros salvas</string>
+    <string name="no_macros">Nenhuma macro salva</string>
+    <string name="no_macros_hint">Va para Albums, selecione albums e toque em Salvar macro</string>
+    <string name="macros_info">Macros permitem ocultar ou exibir varios albums de uma so vez com um toque</string>
+    <string name="macro_album_count">%d albums</string>
+    <string name="run_macro">Executar macro</string>
+    <string name="delete_macro">Excluir macro</string>
+    <string name="macro_executed">Macro executada com sucesso</string>
+    <string name="confirm_delete_macro">Excluir esta macro?</string>
+
+    <!-- Dialog -->
+    <string name="save_macro_title">Salvar Macro</string>
+    <string name="save_macro_subtitle">Defina um nome e a acao para esta macro</string>
+    <string name="macro_name_hint">Nome da macro</string>
+    <string name="macro_action_label">Acao</string>
+    <string name="action_hide">Ocultar</string>
+    <string name="action_show">Exibir</string>
+    <string name="cancel">Cancelar</string>
+    <string name="save">Salvar</string>
+    <string name="delete">Excluir</string>
+    <string name="confirm">Confirmar</string>
+    <string name="macro_name_empty">Informe um nome para a macro</string>
+    <string name="macro_saved">Macro salva com sucesso</string>
+
+    <!-- Accessibility -->
+    <string name="album_cover_desc">Capa do album</string>
+</resources>

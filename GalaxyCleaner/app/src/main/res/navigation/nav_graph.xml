@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/cleanerFragment">
+
+    <fragment
+        android:id="@+id/cleanerFragment"
+        android:name="com.galaxycleaner.app.ui.cleaner.CleanerFragment"
+        android:label="@string/nav_cleaner" />
+
+    <fragment
+        android:id="@+id/albumsFragment"
+        android:name="com.galaxycleaner.app.ui.albums.AlbumsFragment"
+        android:label="@string/nav_albums" />
+
+    <fragment
+        android:id="@+id/macrosFragment"
+        android:name="com.galaxycleaner.app.ui.albums.MacrosFragment"
+        android:label="@string/nav_macros" />
+
+</navigation>

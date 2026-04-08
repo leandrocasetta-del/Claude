@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/cleanerFragment"
+        android:icon="@drawable/ic_clean"
+        android:title="@string/nav_cleaner" />
+
+    <item
+        android:id="@+id/albumsFragment"
+        android:icon="@drawable/ic_album_placeholder"
+        android:title="@string/nav_albums" />
+
+    <item
+        android:id="@+id/macrosFragment"
+        android:icon="@drawable/ic_macro"
+        android:title="@string/nav_macros" />
+
+</menu>

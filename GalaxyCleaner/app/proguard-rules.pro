@@ -1,0 +1,3 @@
+-keep class com.galaxycleaner.app.model.** { *; }
+-keepattributes *Annotation*
+-keepattributes SourceFile,LineNumberTable
