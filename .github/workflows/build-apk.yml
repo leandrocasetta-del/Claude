@@ -38,7 +38,7 @@ jobs:
       - name: Generate native Android structure
         run: flutter create --project-name diagnosticos_app --platforms android .
 
-      - name: Patch Kotlin and compileSdk
+      - name: Patch Kotlin, compileSdk and NDK version
         run: |
           SETTINGS=android/settings.gradle.kts
           if [ ! -f "$SETTINGS" ]; then SETTINGS=android/settings.gradle; fi
@@ -48,10 +48,24 @@ jobs:
           BUILD_GRADLE=android/app/build.gradle.kts
           if [ ! -f "$BUILD_GRADLE" ]; then BUILD_GRADLE=android/app/build.gradle; fi
           echo "Editing $BUILD_GRADLE"
-          sed -i -E 's/compileSdk = flutter\.compileSdkVersion/compileSdk = 35/' "$BUILD_GRADLE"
-          sed -i -E 's/compileSdkVersion flutter\.compileSdkVersion/compileSdkVersion 35/' "$BUILD_GRADLE"
-          sed -i -E 's/compileSdk flutter\.compileSdkVersion/compileSdk 35/' "$BUILD_GRADLE"
-          grep -E 'compileSdk' "$BUILD_GRADLE" || true
+          python3 <<PY
+          path = "$BUILD_GRADLE"
+          with open(path) as f:
+              content = f.read()
+          import re
+          # Set compileSdk to 35
+          content = re.sub(r'compileSdk\s*=\s*flutter\.compileSdkVersion', 'compileSdk = 35', content)
+          content = re.sub(r'compileSdk\s+flutter\.compileSdkVersion', 'compileSdk 35', content)
+          # Set/replace ndkVersion to 27.0.12077973
+          if 'ndkVersion' in content:
+              content = re.sub(r'ndkVersion\s*=\s*[^\n]+', 'ndkVersion = "27.0.12077973"', content)
+              content = re.sub(r'ndkVersion\s+[^\n]+', 'ndkVersion = "27.0.12077973"', content)
+          else:
+              content = re.sub(r'(compileSdk\s*=\s*35)', r'\1\n    ndkVersion = "27.0.12077973"', content, count=1)
+          with open(path, 'w') as f:
+              f.write(content)
+          print(content)
+          PY
 
       - name: Patch AndroidManifest.xml
         run: |
