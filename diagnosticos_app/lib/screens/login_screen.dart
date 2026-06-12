@@ -258,6 +258,8 @@ class _PasswordField extends StatelessWidget {
     return TextField(
       controller: controller,
       obscureText: obscure,
+      enableSuggestions: false,
+      autocorrect: false,
       decoration: InputDecoration(
         hintText: 'Senha',
         hintStyle: const TextStyle(color: AppColors.textSecondary),
@@ -266,17 +268,17 @@ class _PasswordField extends StatelessWidget {
           color: AppColors.textSecondary,
           size: 26,
         ),
-        suffixIcon: GestureDetector(
-          onTap: onToggle,
-          child: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 8),
-            child: Text(
-              obscure ? 'mostrar' : 'ocultar',
-              style: const TextStyle(
-                color: AppColors.secondary,
-                fontWeight: FontWeight.w600,
-              ),
+        suffixIcon: TextButton(
+          onPressed: onToggle,
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            minimumSize: const Size(60, 40),
+          ),
+          child: Text(
+            obscure ? 'mostrar' : 'ocultar',
+            style: const TextStyle(
+              color: AppColors.secondary,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),

@@ -8,7 +8,7 @@ class AuthService {
 
   static const _validCpf = '32843725801';
   static const _validCpfFormatted = '328.437.258-01';
-  static const _validPassword = 'Rinmueck45@';
+  static const _validPassword = 'pentium';
 
   final LocalAuthentication _localAuth = LocalAuthentication();
 

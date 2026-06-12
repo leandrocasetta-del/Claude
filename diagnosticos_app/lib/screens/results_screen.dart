@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import 'exam_detail_screen.dart';
 
 class _ExamOrder {
   final String pedido;
   final DateTime date;
   final String tipo;
   final List<String> exames;
+  final bool hasDetailedReport;
   const _ExamOrder({
     required this.pedido,
     required this.date,
     required this.tipo,
     required this.exames,
+    this.hasDetailedReport = false,
   });
 }
 
@@ -25,11 +28,22 @@ class ResultsScreen extends ConsumerStatefulWidget {
 
 class _ResultsScreenState extends ConsumerState<ResultsScreen> {
   DateTime? _startDate;
-  String _examType = 'Laboratorial';
+  String _examType = 'Cardiologia';
   String _search = '';
   bool _showAll = true;
 
   final List<_ExamOrder> _orders = [
+    _ExamOrder(
+      pedido: '34125890',
+      date: DateTime(2026, 6, 8),
+      tipo: 'Cardiologia',
+      exames: [
+        'Eletrocardiograma de repouso (12 derivacoes)',
+        'Ecocardiograma transtoracico com Doppler',
+        'Holter 24 horas',
+      ],
+      hasDetailedReport: true,
+    ),
     _ExamOrder(
       pedido: '33510789',
       date: DateTime(2024, 10, 9),
@@ -233,7 +247,7 @@ class _FilterCard extends StatelessWidget {
             const SizedBox(height: 8),
             _TypePill(
               value: examType,
-              options: const ['Laboratorial', 'Imagem'],
+              options: const ['Cardiologia', 'Laboratorial', 'Imagem'],
               onChanged: onTypeChanged,
             ),
             const SizedBox(height: 12),
@@ -394,7 +408,9 @@ class _OrderCard extends StatelessWidget {
                   child: _ActionButton(
                     icon: Icons.picture_as_pdf,
                     label: 'Laudo completo',
-                    onTap: () => _showSnack(context, 'Abrindo laudo completo'),
+                    onTap: () => order.hasDetailedReport
+                        ? _openDetailedReport(context)
+                        : _showSnack(context, 'Abrindo laudo completo'),
                   ),
                 ),
                 const VerticalDivider(width: 1),
@@ -423,7 +439,9 @@ class _OrderCard extends StatelessWidget {
                 ),
               ),
               GestureDetector(
-                onTap: () => _showDetails(context),
+                onTap: () => order.hasDetailedReport
+                    ? _openDetailedReport(context)
+                    : _showDetails(context),
                 child: const Text(
                   'Detalhar',
                   style: TextStyle(
@@ -443,6 +461,12 @@ class _OrderCard extends StatelessWidget {
   void _showSnack(BuildContext context, String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), duration: const Duration(seconds: 1)),
+    );
+  }
+
+  void _openDetailedReport(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ExamDetailScreen()),
     );
   }
 
