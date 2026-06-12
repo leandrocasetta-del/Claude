@@ -36,6 +36,12 @@ jobs:
       - name: Generate native Android structure
         run: flutter create --project-name diagnosticos_app --platforms android .
 
+      - name: Patch Kotlin version in settings.gradle
+        run: |
+          SETTINGS=android/settings.gradle
+          sed -i -E 's/id "org\.jetbrains\.kotlin\.android" version "[^"]+"/id "org.jetbrains.kotlin.android" version "1.9.22"/' "$SETTINGS"
+          cat "$SETTINGS"
+
       - name: Patch AndroidManifest.xml
         run: |
           MANIFEST=android/app/src/main/AndroidManifest.xml
