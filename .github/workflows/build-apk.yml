@@ -1,0 +1,92 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - claude/cool-newton-nvfa1g
+    paths:
+      - 'diagnosticos_app/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: diagnosticos_app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: stable
+          cache: true
+
+      - name: Generate native Android structure
+        run: flutter create --project-name diagnosticos_app --platforms android .
+
+      - name: Patch AndroidManifest.xml
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          python3 <<'PY'
+          import re
+          path = 'android/app/src/main/AndroidManifest.xml'
+          with open(path) as f:
+              content = f.read()
+          perms = '''
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+              <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+              <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+          '''
+          if 'USE_BIOMETRIC' not in content:
+              content = content.replace('<application', perms + '\n    <application', 1)
+          content = content.replace(
+              'android:usesCleartextTraffic="false"',
+              'android:usesCleartextTraffic="true"'
+          )
+          if 'usesCleartextTraffic' not in content:
+              content = content.replace(
+                  '<application',
+                  '<application android:usesCleartextTraffic="true"',
+                  1
+              )
+          with open(path, 'w') as f:
+              f.write(content)
+          PY
+          cat $MANIFEST
+
+      - name: Patch MainActivity to FlutterFragmentActivity
+        run: |
+          MAIN=$(find android/app/src/main -name 'MainActivity.kt' | head -1)
+          if [ -n "$MAIN" ]; then
+            sed -i 's/import io.flutter.embedding.android.FlutterActivity/import io.flutter.embedding.android.FlutterFragmentActivity/' "$MAIN"
+            sed -i 's/: FlutterActivity()/: FlutterFragmentActivity()/' "$MAIN"
+            cat "$MAIN"
+          fi
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnosticos-app-debug
+          path: diagnosticos_app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
