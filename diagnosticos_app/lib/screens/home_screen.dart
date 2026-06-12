@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import '../models/models.dart';
 import '../providers/providers.dart';
 import '../theme/app_theme.dart';
-import '../widgets/service_card.dart';
-import '../widgets/section_header.dart';
-import 'schedule_exam_screen.dart';
-import 'preparation_screen.dart';
+import 'login_screen.dart';
 import 'results_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -15,152 +10,125 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(userProvider);
-    final appointmentsAsync = ref.watch(appointmentsProvider);
-
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(userProvider);
-          ref.invalidate(appointmentsProvider);
-        },
-        child: SafeArea(
-          child: ListView(
-            padding: EdgeInsets.zero,
+      backgroundColor: AppColors.primary,
+      body: Stack(
+        children: [
+          Column(
             children: [
-              userAsync.when(
-                data: (user) => _Header(name: user.name.split(' ').first),
-                loading: () => const _Header(name: '...'),
-                error: (e, _) => _Header(name: 'Visitante'),
+              const _UserHeader(
+                name: 'Leandro Casetta',
+                prontuario: '21356284',
+                birthDate: '11/04/1983',
               ),
-              const SizedBox(height: 16),
-              appointmentsAsync.when(
-                data: (list) {
-                  final next = list
-                      .where((a) => a.dateTime.isAfter(DateTime.now()))
-                      .toList()
-                    ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
-                  if (next.isEmpty) return const SizedBox.shrink();
-                  return _NextAppointmentCard(appointment: next.first);
-                },
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: _LoadingCard(),
-                ),
-                error: (e, _) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _ErrorBanner(message: e.toString()),
-                ),
-              ),
-              const SectionHeader(title: 'Servicos'),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: GridView.count(
-                  crossAxisCount: 4,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.85,
-                  children: [
-                    ServiceCard(
-                      icon: Icons.add_circle_outline,
-                      label: 'Agendar exame',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ScheduleExamScreen(),
-                        ),
+              Expanded(
+                child: Container(
+                  color: AppColors.primary,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: CustomPaint(painter: _BottomWavePainter()),
                       ),
-                    ),
-                    ServiceCard(
-                      icon: Icons.description_outlined,
-                      label: 'Meus resultados',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ResultsScreen(),
-                        ),
+                      ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                        children: [
+                          _MenuCard(
+                            icon: Icons.assignment_turned_in_outlined,
+                            label: 'Resultado de exames',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ResultsScreen(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _MenuCard(
+                            icon: Icons.calendar_today_outlined,
+                            label: 'Meus agendamentos',
+                            onTap: () => _snack(context, 'Meus agendamentos'),
+                          ),
+                          const SizedBox(height: 12),
+                          _MenuCard(
+                            icon: Icons.vaccines_outlined,
+                            label: 'Vacinas',
+                            onTap: () =>
+                                _snack(context, 'Carteira de vacinacao'),
+                          ),
+                          const SizedBox(height: 12),
+                          _MenuCard(
+                            icon: Icons.receipt_long_outlined,
+                            label: 'Extrato de conta particular',
+                            onTap: () => _snack(context, 'Extrato de conta'),
+                          ),
+                          const SizedBox(height: 12),
+                          _MenuCard(
+                            icon: Icons.volunteer_activism_outlined,
+                            label: 'Doe aqui',
+                            onTap: () => _snack(context, 'Faca uma doacao'),
+                          ),
+                          const SizedBox(height: 12),
+                          _MenuCard(
+                            icon: Icons.handshake_outlined,
+                            label: 'Acesso temporario',
+                            onTap: () =>
+                                _snack(context, 'Compartilhar acesso'),
+                          ),
+                        ],
                       ),
-                    ),
-                    ServiceCard(
-                      icon: Icons.menu_book_outlined,
-                      label: 'Preparos',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const PreparationScreen(),
-                        ),
-                      ),
-                    ),
-                    ServiceCard(
-                      icon: Icons.qr_code_scanner_outlined,
-                      label: 'Check-in',
-                      onTap: () => _snack(context, 'Check-in via QR Code'),
-                    ),
-                    ServiceCard(
-                      icon: Icons.local_hospital_outlined,
-                      label: 'Convenios',
-                      onTap: () => _snack(context, 'Convenios aceitos'),
-                    ),
-                    ServiceCard(
-                      icon: Icons.payment_outlined,
-                      label: 'Pagamentos',
-                      onTap: () => _snack(context, 'Pagamentos'),
-                    ),
-                    ServiceCard(
-                      icon: Icons.support_agent_outlined,
-                      label: 'Atendimento',
-                      onTap: () => _snack(context, 'Fale com a gente'),
-                    ),
-                    ServiceCard(
-                      icon: Icons.more_horiz,
-                      label: 'Mais',
-                      onTap: () => _snack(context, 'Mais servicos'),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              SectionHeader(
-                title: 'Destaques',
-                actionLabel: 'Ver todos',
-                onAction: () {},
-              ),
-              SizedBox(
-                height: 160,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  children: const [
-                    _HighlightCard(
-                      title: 'Check-up Cardiologico',
-                      subtitle: 'Pacote completo a partir de R\$ 590',
-                      color: AppColors.primary,
-                      icon: Icons.favorite_outline,
-                    ),
-                    SizedBox(width: 12),
-                    _HighlightCard(
-                      title: 'Resultados pelo app',
-                      subtitle: 'Disponiveis em ate 24h',
-                      color: AppColors.accent,
-                      icon: Icons.cloud_download_outlined,
-                    ),
-                    SizedBox(width: 12),
-                    _HighlightCard(
-                      title: 'Vacinas',
-                      subtitle: 'Calendario completo disponivel',
-                      color: AppColors.success,
-                      icon: Icons.vaccines_outlined,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
             ],
           ),
-        ),
+          Positioned(
+            right: 16,
+            bottom: 24,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: const BoxDecoration(
+                    color: AppColors.whatsapp,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chat,
+                    color: Colors.white,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'suporte\ntecnico',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: SafeArea(
+              child: IconButton(
+                icon: const Icon(
+                  Icons.settings_outlined,
+                  color: Colors.white,
+                  size: 28,
+                ),
+                onPressed: () => _showSettings(context, ref),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -170,256 +138,268 @@ class HomeScreen extends ConsumerWidget {
       SnackBar(content: Text(msg), duration: const Duration(seconds: 1)),
     );
   }
-}
 
-class _Header extends StatelessWidget {
-  final String name;
-  const _Header({required this.name});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      decoration: const BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
+  void _showSettings(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Consumer(
+              builder: (context, ref, _) {
+                final bioAvail = ref.watch(biometricAvailableProvider);
+                final bioOn = ref.watch(biometricEnabledProvider);
+                final notifOn = ref.watch(notificationsEnabledProvider);
+                return Column(
+                  children: [
+                    SwitchListTile(
+                      title: const Text('Notificacoes'),
+                      subtitle: const Text('Lembretes de exame'),
+                      value: notifOn.value ?? true,
+                      activeColor: AppColors.primary,
+                      onChanged: (v) async {
+                        await ref
+                            .read(notificationServiceProvider)
+                            .setEnabled(v);
+                        ref.invalidate(notificationsEnabledProvider);
+                      },
+                    ),
+                    if (bioAvail.value == true)
+                      SwitchListTile(
+                        title: const Text('Login por biometria'),
+                        subtitle: const Text('Use digital ou face para entrar'),
+                        value: bioOn.value ?? false,
+                        activeColor: AppColors.primary,
+                        onChanged: (v) async {
+                          if (v) {
+                            final authed = await ref
+                                .read(authServiceProvider)
+                                .authenticateWithBiometric();
+                            if (authed) {
+                              await ref
+                                  .read(authServiceProvider)
+                                  .setBiometricEnabled(true);
+                            }
+                          } else {
+                            await ref
+                                .read(authServiceProvider)
+                                .setBiometricEnabled(false);
+                          }
+                          ref.invalidate(biometricEnabledProvider);
+                        },
+                      ),
+                  ],
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout, color: AppColors.accent),
+              title: const Text(
+                'Sair',
+                style: TextStyle(color: AppColors.accent),
+              ),
+              onTap: () async {
+                await ref.read(authControllerProvider.notifier).logout();
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (_) => false,
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.white,
-            child: Text(
-              name.isEmpty ? '?' : name.substring(0, 1),
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Ola,',
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
-                ),
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_outlined,
-              color: Colors.white,
-            ),
-            onPressed: () {},
-          ),
-        ],
-      ),
     );
   }
 }
 
-class _NextAppointmentCard extends StatelessWidget {
-  final Appointment appointment;
-  const _NextAppointmentCard({required this.appointment});
+class _UserHeader extends StatelessWidget {
+  final String name;
+  final String prontuario;
+  final String birthDate;
 
-  @override
-  Widget build(BuildContext context) {
-    final df = DateFormat("dd 'de' MMMM 'as' HH:mm", 'pt_BR');
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'PROXIMO EXAME',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                Icons.chevron_right,
-                color: AppColors.textSecondary.withOpacity(0.6),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            appointment.exam.name,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Icon(Icons.event, size: 14, color: AppColors.textSecondary),
-              const SizedBox(width: 4),
-              Text(
-                df.format(appointment.dateTime),
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                size: 14,
-                color: AppColors.textSecondary,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                appointment.unit,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HighlightCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Color color;
-  final IconData icon;
-
-  const _HighlightCard({
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.icon,
+  const _UserHeader({
+    required this.name,
+    required this.prontuario,
+    required this.birthDate,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 280,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Icon(icon, color: Colors.white, size: 32),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      color: AppColors.primary,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+          child: Column(
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+              Container(
+                width: 96,
+                height: 96,
+                decoration: const BoxDecoration(
+                  color: AppColors.cyan,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person,
+                  color: AppColors.secondary,
+                  size: 56,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 24),
               Text(
-                subtitle,
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          prontuario,
+                          style: const TextStyle(
+                            color: AppColors.cyan,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        const Text(
+                          'Prontuario',
+                          style: TextStyle(
+                            color: AppColors.cyan,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          birthDate,
+                          style: const TextStyle(
+                            color: AppColors.cyan,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        const Text(
+                          'Data de nascimento',
+                          style: TextStyle(
+                            color: AppColors.cyan,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard();
+class _MenuCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _MenuCard({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 110,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: const Center(child: CircularProgressIndicator()),
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  final String message;
-  const _ErrorBanner({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.warning_amber, color: AppColors.warning, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(fontSize: 12, color: AppColors.warning),
-            ),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 40,
+                child: Icon(icon, color: AppColors.secondary, size: 28),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+class _BottomWavePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = AppColors.background;
+    final path = Path()
+      ..moveTo(0, size.height)
+      ..lineTo(0, size.height - 80)
+      ..quadraticBezierTo(
+        size.width * 0.3,
+        size.height - 150,
+        size.width * 0.6,
+        size.height - 90,
+      )
+      ..quadraticBezierTo(
+        size.width * 0.8,
+        size.height - 50,
+        size.width,
+        size.height - 80,
+      )
+      ..lineTo(size.width, size.height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

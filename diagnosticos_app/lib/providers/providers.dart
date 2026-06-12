@@ -1,14 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/models.dart';
-import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 
-final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
-
-final authServiceProvider = Provider<AuthService>(
-  (ref) => AuthService(ref.read(apiServiceProvider)),
-);
+final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
 final notificationServiceProvider = Provider<NotificationService>(
   (ref) => NotificationService.instance,
@@ -47,18 +41,14 @@ class AuthController extends StateNotifier<AuthState> {
 
   Future<bool> login(String cpf, String password) async {
     state = state.copyWith(isLoading: true, error: null);
-    try {
-      final ok = await _service.login(cpf, password);
-      state = state.copyWith(
-        isAuthenticated: ok,
-        isLoading: false,
-        error: ok ? null : 'CPF ou senha invalidos',
-      );
-      return ok;
-    } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
-      return false;
-    }
+    await Future.delayed(const Duration(milliseconds: 600));
+    final ok = await _service.login(cpf, password);
+    state = state.copyWith(
+      isAuthenticated: ok,
+      isLoading: false,
+      error: ok ? null : 'CPF/e-mail ou senha invalidos',
+    );
+    return ok;
   }
 
   Future<bool> loginWithBiometric() async {
@@ -91,24 +81,4 @@ final biometricEnabledProvider = FutureProvider<bool>(
 
 final notificationsEnabledProvider = FutureProvider<bool>(
   (ref) => ref.read(notificationServiceProvider).isEnabled(),
-);
-
-final userProvider = FutureProvider<UserProfile>(
-  (ref) => ref.read(apiServiceProvider).fetchUser(),
-);
-
-final appointmentsProvider = FutureProvider<List<Appointment>>(
-  (ref) => ref.read(apiServiceProvider).fetchAppointments(),
-);
-
-final examTypesProvider = FutureProvider<List<ExamType>>(
-  (ref) => ref.read(apiServiceProvider).fetchExamTypes(),
-);
-
-final resultsProvider = FutureProvider<List<ExamResult>>(
-  (ref) => ref.read(apiServiceProvider).fetchResults(),
-);
-
-final unitsProvider = FutureProvider<List<Unit>>(
-  (ref) => ref.read(apiServiceProvider).fetchUnits(),
 );

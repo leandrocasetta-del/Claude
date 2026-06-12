@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  static const Color primary = Color(0xFF003D7A);
-  static const Color primaryDark = Color(0xFF002855);
-  static const Color primaryLight = Color(0xFF1976D2);
+  static const Color primary = Color(0xFF5E4B9B);
+  static const Color primaryDark = Color(0xFF4A3A82);
+  static const Color primaryLight = Color(0xFF7A66B5);
+  static const Color secondary = Color(0xFF1F5184);
+  static const Color cyan = Color(0xFF4DC4D8);
+  static const Color cyanDark = Color(0xFF2BA8BC);
+  static const Color whatsapp = Color(0xFF25D366);
+  static const Color helpOrange = Color(0xFFC9876B);
   static const Color accent = Color(0xFFE30613);
-  static const Color background = Color(0xFFF5F7FA);
+  static const Color background = Color(0xFFF2F2F2);
   static const Color surface = Colors.white;
   static const Color textPrimary = Color(0xFF1A1A1A);
   static const Color textSecondary = Color(0xFF6B7280);
+  static const Color textOnPrimary = Colors.white;
   static const Color divider = Color(0xFFE5E7EB);
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
@@ -23,7 +29,7 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.background,
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
-        secondary: AppColors.accent,
+        secondary: AppColors.secondary,
         surface: AppColors.surface,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
@@ -37,7 +43,7 @@ class AppTheme {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
-        centerTitle: false,
+        centerTitle: true,
         titleTextStyle: GoogleFonts.inter(
           fontSize: 18,
           fontWeight: FontWeight.w600,
@@ -48,9 +54,9 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size.fromHeight(56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
           textStyle: GoogleFonts.inter(
             fontSize: 16,
@@ -59,31 +65,19 @@ class AppTheme {
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
+        filled: false,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
+          horizontal: 0,
+          vertical: 12,
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.divider),
+        border: const UnderlineInputBorder(
+          borderSide: BorderSide(color: AppColors.divider),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.divider),
+        enabledBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: AppColors.divider),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
-        ),
-      ),
-      cardTheme: CardTheme(
-        color: Colors.white,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.divider),
+        focusedBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
       ),
     );

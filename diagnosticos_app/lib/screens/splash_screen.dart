@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
-import 'home_shell.dart';
+import 'home_screen.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -24,15 +24,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final authService = ref.read(authServiceProvider);
     final logged = await authService.isLoggedIn();
     if (!mounted) return;
-    if (logged) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeShell()),
-      );
-    } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-    }
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => logged ? const HomeScreen() : const LoginScreen(),
+      ),
+    );
   }
 
   @override
@@ -42,36 +38,28 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Icon(
-                Icons.favorite,
-                size: 56,
-                color: AppColors.accent,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Centro de Diagnosticos',
+          children: const [
+            Text(
+              'hcor',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
+                fontSize: 72,
+                fontWeight: FontWeight.w800,
+                height: 1,
+                letterSpacing: -2,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Clone de estudo',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+            SizedBox(height: 8),
+            Text(
+              'ASSOCIACAO BENEFICENTE SIRIA',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                letterSpacing: 2,
+              ),
             ),
-            const SizedBox(height: 48),
-            const CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 48),
+            CircularProgressIndicator(color: Colors.white),
           ],
         ),
       ),

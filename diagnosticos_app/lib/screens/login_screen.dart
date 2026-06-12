@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../theme/app_theme.dart';
-import 'home_shell.dart';
+import '../widgets/wave_header.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -12,18 +13,18 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _cpfController = TextEditingController(text: '123.456.789-00');
-  final _passwordController = TextEditingController(text: '123456');
+  final _loginController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscure = true;
 
   Future<void> _login() async {
     final ok = await ref
         .read(authControllerProvider.notifier)
-        .login(_cpfController.text, _passwordController.text);
+        .login(_loginController.text, _passwordController.text);
     if (!mounted) return;
     if (ok) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeShell()),
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
     }
   }
@@ -34,13 +35,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
     if (ok) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeShell()),
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Biometria nao reconhecida ou nao habilitada'),
-        ),
+        const SnackBar(content: Text('Biometria nao habilitada')),
       );
     }
   }
@@ -50,187 +49,324 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final auth = ref.watch(authControllerProvider);
     final bioAvailable = ref.watch(biometricAvailableProvider);
     final bioEnabled = ref.watch(biometricEnabledProvider);
-
     final showBio = bioAvailable.value == true && bioEnabled.value == true;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 32),
-              Center(
-                child: Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.favorite,
-                    size: 40,
-                    color: AppColors.accent,
-                  ),
-                ),
+        bottom: false,
+        child: Column(
+          children: [
+            const WaveHeader(
+              height: 280,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _HcorLogo(),
+                ],
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Bem-vindo',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Acesse sua conta para agendar exames e ver resultados',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 40),
-              TextField(
-                controller: _cpfController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'CPF',
-                  prefixIcon: Icon(Icons.person_outline),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                obscureText: _obscure,
-                decoration: InputDecoration(
-                  labelText: 'Senha',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscure ? Icons.visibility_off : Icons.visibility,
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _LoginField(
+                      controller: _loginController,
+                      icon: Icons.person_outline,
+                      hint: 'CPF ou e-mail',
                     ),
-                    onPressed: () => setState(() => _obscure = !_obscure),
-                  ),
-                ),
-              ),
-              if (auth.error != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: AppColors.accent,
-                        size: 18,
+                    const SizedBox(height: 16),
+                    _PasswordField(
+                      controller: _passwordController,
+                      obscure: _obscure,
+                      onToggle: () => setState(() => _obscure = !_obscure),
+                    ),
+                    if (auth.error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        auth.error!,
+                        style: const TextStyle(
+                          color: AppColors.accent,
+                          fontSize: 13,
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          auth.error!,
-                          style: const TextStyle(
-                            color: AppColors.accent,
-                            fontSize: 13,
+                    ],
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: () {},
+                        child: const Text(
+                          'esqueci minha senha',
+                          style: TextStyle(
+                            color: AppColors.secondary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: auth.isLoading ? null : _login,
+                      child: auth.isLoading
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Text('Entrar'),
+                    ),
+                    const SizedBox(height: 24),
+                    const Center(
+                      child: Text(
+                        'Nao possui acesso?',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondary,
+                      ),
+                      child: const Text('Criar senha de acesso'),
+                    ),
+                    if (showBio) ...[
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: _biometricLogin,
+                        icon: const Icon(
+                          Icons.fingerprint,
+                          color: AppColors.primary,
+                        ),
+                        label: const Text(
+                          'Entrar com biometria',
+                          style: TextStyle(color: AppColors.primary),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                          side: const BorderSide(color: AppColors.primary),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
                       ),
                     ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text(
-                    'Esqueci minha senha',
-                    style: TextStyle(color: AppColors.primary),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: auth.isLoading ? null : _login,
-                child: auth.isLoading
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
-                      )
-                    : const Text('Entrar'),
-              ),
-              if (showBio) ...[
-                const SizedBox(height: 24),
-                const Row(
-                  children: [
-                    Expanded(child: Divider()),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'ou',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                    ),
-                    Expanded(child: Divider()),
+                    const SizedBox(height: 24),
                   ],
                 ),
-                const SizedBox(height: 24),
-                OutlinedButton.icon(
-                  onPressed: _biometricLogin,
-                  icon: const Icon(Icons.fingerprint, color: AppColors.primary),
-                  label: const Text(
-                    'Entrar com biometria',
-                    style: TextStyle(color: AppColors.primary),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
-                    side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 32),
-              Center(
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text.rich(
-                    TextSpan(
-                      text: 'Ainda nao tem cadastro? ',
-                      style: TextStyle(color: AppColors.textSecondary),
-                      children: [
-                        TextSpan(
-                          text: 'Cadastre-se',
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
               ),
-            ],
+            ),
+            const _QuickActions(),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HcorLogo extends StatelessWidget {
+  const _HcorLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          'hcor',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 64,
+            fontWeight: FontWeight.w800,
+            height: 1,
+            letterSpacing: -2,
+            fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'ASSOCIACAO',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            letterSpacing: 2,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const Text(
+          'BENEFICENTE SIRIA',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            letterSpacing: 2,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LoginField extends StatelessWidget {
+  final TextEditingController controller;
+  final IconData icon;
+  final String hint;
+
+  const _LoginField({
+    required this.controller,
+    required this.icon,
+    required this.hint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.emailAddress,
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: AppColors.textSecondary),
+        prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 26),
+      ),
+    );
+  }
+}
+
+class _PasswordField extends StatelessWidget {
+  final TextEditingController controller;
+  final bool obscure;
+  final VoidCallback onToggle;
+
+  const _PasswordField({
+    required this.controller,
+    required this.obscure,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      decoration: InputDecoration(
+        hintText: 'Senha',
+        hintStyle: const TextStyle(color: AppColors.textSecondary),
+        prefixIcon: const Icon(
+          Icons.lock_outline,
+          color: AppColors.textSecondary,
+          size: 26,
+        ),
+        suffixIcon: GestureDetector(
+          onTap: onToggle,
+          child: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 8),
+            child: Text(
+              obscure ? 'mostrar' : 'ocultar',
+              style: const TextStyle(
+                color: AppColors.secondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: const [
+          _QuickAction(
+            icon: Icons.help_outline,
+            label1: 'duvidas',
+            label2: 'frequentes',
+            color: AppColors.helpOrange,
+          ),
+          _QuickAction(
+            icon: Icons.phone,
+            label1: 'fale',
+            label2: 'conosco',
+            color: AppColors.secondary,
+          ),
+          _QuickAction(
+            icon: Icons.person,
+            label1: 'Portal',
+            label2: 'Medico',
+            color: AppColors.primaryLight,
+          ),
+          _QuickAction(
+            icon: Icons.chat,
+            label1: 'suporte',
+            label2: 'tecnico',
+            color: AppColors.whatsapp,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  final IconData icon;
+  final String label1;
+  final String label2;
+  final Color color;
+
+  const _QuickAction({
+    required this.icon,
+    required this.label1,
+    required this.label2,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          child: Icon(icon, color: Colors.white, size: 28),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label1,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          label2,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 }
