@@ -1,31 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/providers.dart';
 import '../theme/app_theme.dart';
 import 'home_shell.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _cpfController = TextEditingController(text: '123.456.789-00');
   final _passwordController = TextEditingController(text: '123456');
   bool _obscure = true;
-  bool _loading = false;
 
   Future<void> _login() async {
-    setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+    final ok = await ref
+        .read(authControllerProvider.notifier)
+        .login(_cpfController.text, _passwordController.text);
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeShell()),
-    );
+    if (ok) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeShell()),
+      );
+    }
+  }
+
+  Future<void> _biometricLogin() async {
+    final ok =
+        await ref.read(authControllerProvider.notifier).loginWithBiometric();
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeShell()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Biometria nao reconhecida ou nao habilitada'),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = ref.watch(authControllerProvider);
+    final bioAvailable = ref.watch(biometricAvailableProvider);
+    final bioEnabled = ref.watch(biometricEnabledProvider);
+
+    final showBio = bioAvailable.value == true && bioEnabled.value == true;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -93,6 +120,35 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+              if (auth.error != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppColors.accent,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          auth.error!,
+                          style: const TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,
@@ -106,8 +162,8 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _loading ? null : _login,
-                child: _loading
+                onPressed: auth.isLoading ? null : _login,
+                child: auth.isLoading
                     ? const SizedBox(
                         height: 24,
                         width: 24,
@@ -118,36 +174,38 @@ class _LoginScreenState extends State<LoginScreen> {
                       )
                     : const Text('Entrar'),
               ),
-              const SizedBox(height: 24),
-              const Row(
-                children: [
-                  Expanded(child: Divider()),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'ou',
-                      style: TextStyle(color: AppColors.textSecondary),
+              if (showBio) ...[
+                const SizedBox(height: 24),
+                const Row(
+                  children: [
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'ou',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                    Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  onPressed: _biometricLogin,
+                  icon: const Icon(Icons.fingerprint, color: AppColors.primary),
+                  label: const Text(
+                    'Entrar com biometria',
+                    style: TextStyle(color: AppColors.primary),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  Expanded(child: Divider()),
-                ],
-              ),
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.fingerprint, color: AppColors.primary),
-                label: const Text(
-                  'Entrar com biometria',
-                  style: TextStyle(color: AppColors.primary),
                 ),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                  side: const BorderSide(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
+              ],
               const SizedBox(height: 32),
               Center(
                 child: TextButton(

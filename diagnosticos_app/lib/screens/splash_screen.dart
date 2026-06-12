@@ -1,24 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/providers.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
+import 'home_shell.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
+    Future.delayed(const Duration(milliseconds: 1500), _decideRoute);
+  }
+
+  Future<void> _decideRoute() async {
+    if (!mounted) return;
+    final authService = ref.read(authServiceProvider);
+    final logged = await authService.isLoggedIn();
+    if (!mounted) return;
+    if (logged) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeShell()),
+      );
+    } else {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
-    });
+    }
   }
 
   @override
@@ -54,10 +68,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 8),
             const Text(
               'Clone de estudo',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.white70, fontSize: 14),
             ),
             const SizedBox(height: 48),
             const CircularProgressIndicator(color: Colors.white),

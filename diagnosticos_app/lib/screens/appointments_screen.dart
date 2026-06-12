@@ -1,23 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../data/mock_data.dart';
 import '../models/models.dart';
+import '../providers/providers.dart';
 import '../theme/app_theme.dart';
 import 'schedule_exam_screen.dart';
 
-class AppointmentsScreen extends StatelessWidget {
+class AppointmentsScreen extends ConsumerWidget {
   const AppointmentsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final upcoming = MockData.appointments
-        .where((a) => a.dateTime.isAfter(DateTime.now()))
-        .toList()
-      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
-    final past = MockData.appointments
-        .where((a) => a.dateTime.isBefore(DateTime.now()))
-        .toList()
-      ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(appointmentsProvider);
 
     return DefaultTabController(
       length: 2,
@@ -43,11 +37,43 @@ class AppointmentsScreen extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const ScheduleExamScreen()),
           ),
         ),
-        body: TabBarView(
-          children: [
-            _AppointmentList(items: upcoming, emptyMsg: 'Nenhum exame agendado.'),
-            _AppointmentList(items: past, emptyMsg: 'Sem historico.'),
-          ],
+        body: async.when(
+          data: (items) {
+            final upcoming = items
+                .where((a) => a.dateTime.isAfter(DateTime.now()))
+                .toList()
+              ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+            final past = items
+                .where((a) => a.dateTime.isBefore(DateTime.now()))
+                .toList()
+              ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
+            return TabBarView(
+              children: [
+                _AppointmentList(
+                  items: upcoming,
+                  emptyMsg: 'Nenhum exame agendado.',
+                  onRefresh: () async => ref.invalidate(appointmentsProvider),
+                  onCancel: (a) async {
+                    await ref
+                        .read(apiServiceProvider)
+                        .cancelAppointment(a.id);
+                    ref.invalidate(appointmentsProvider);
+                  },
+                ),
+                _AppointmentList(
+                  items: past,
+                  emptyMsg: 'Sem historico.',
+                  onRefresh: () async => ref.invalidate(appointmentsProvider),
+                  onCancel: null,
+                ),
+              ],
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => _ErrorState(
+            message: e.toString(),
+            onRetry: () => ref.invalidate(appointmentsProvider),
+          ),
         ),
       ),
     );
@@ -57,31 +83,49 @@ class AppointmentsScreen extends StatelessWidget {
 class _AppointmentList extends StatelessWidget {
   final List<Appointment> items;
   final String emptyMsg;
+  final Future<void> Function() onRefresh;
+  final Future<void> Function(Appointment)? onCancel;
 
-  const _AppointmentList({required this.items, required this.emptyMsg});
+  const _AppointmentList({
+    required this.items,
+    required this.emptyMsg,
+    required this.onRefresh,
+    required this.onCancel,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return Center(
-        child: Text(
-          emptyMsg,
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
-      );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, i) => _AppointmentCard(appointment: items[i]),
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: items.isEmpty
+          ? ListView(
+              children: [
+                const SizedBox(height: 120),
+                Center(
+                  child: Text(
+                    emptyMsg,
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+              ],
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (_, i) => _AppointmentCard(
+                appointment: items[i],
+                onCancel: onCancel,
+              ),
+            ),
     );
   }
 }
 
 class _AppointmentCard extends StatelessWidget {
   final Appointment appointment;
-  const _AppointmentCard({required this.appointment});
+  final Future<void> Function(Appointment)? onCancel;
+  const _AppointmentCard({required this.appointment, required this.onCancel});
 
   Color _statusColor() {
     switch (appointment.status) {
@@ -95,8 +139,6 @@ class _AppointmentCard extends StatelessWidget {
         return AppColors.accent;
     }
   }
-
-  String _statusText() => appointment.status.name.toUpperCase();
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +197,7 @@ class _AppointmentCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  _statusText(),
+                  appointment.status.name.toUpperCase(),
                   style: TextStyle(
                     color: _statusColor(),
                     fontSize: 10,
@@ -171,13 +213,13 @@ class _AppointmentCard extends StatelessWidget {
           _row(Icons.location_on_outlined, appointment.unit),
           const SizedBox(height: 6),
           _row(Icons.person_outline, appointment.doctor),
-          if (appointment.status != AppointmentStatus.concluido) ...[
+          if (onCancel != null) ...[
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () => onCancel!(appointment),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.accent,
                       side: const BorderSide(color: AppColors.accent),
@@ -215,6 +257,42 @@ class _AppointmentCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.cloud_off_outlined,
+              size: 48,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onRetry,
+              child: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

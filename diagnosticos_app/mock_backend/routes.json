@@ -1,0 +1,5 @@
+{
+  "/api/*": "/$1",
+  "/api/exam-types": "/examTypes",
+  "/api/me": "/user"
+}

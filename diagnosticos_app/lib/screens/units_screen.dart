@@ -1,21 +1,55 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
+import '../providers/providers.dart';
 import '../theme/app_theme.dart';
 
-class UnitsScreen extends StatelessWidget {
+class UnitsScreen extends ConsumerWidget {
   const UnitsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(unitsProvider);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Unidades')),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(20),
-        itemCount: MockData.units.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, i) => _UnitCard(unit: MockData.units[i]),
+      body: async.when(
+        data: (units) => RefreshIndicator(
+          onRefresh: () async => ref.invalidate(unitsProvider),
+          child: ListView.separated(
+            padding: const EdgeInsets.all(20),
+            itemCount: units.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (_, i) => _UnitCard(unit: units[i]),
+          ),
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.cloud_off_outlined,
+                  size: 48,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  e.toString(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => ref.invalidate(unitsProvider),
+                  child: const Text('Tentar novamente'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

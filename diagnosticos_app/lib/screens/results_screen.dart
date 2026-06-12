@@ -1,31 +1,59 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../data/mock_data.dart';
 import '../models/models.dart';
+import '../providers/providers.dart';
 import '../theme/app_theme.dart';
 
-class ResultsScreen extends StatelessWidget {
+class ResultsScreen extends ConsumerWidget {
   const ResultsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final results = MockData.results;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(resultsProvider);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Meus resultados'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
-        ],
+        actions: [IconButton(icon: const Icon(Icons.search), onPressed: () {})],
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(20),
-        itemCount: results.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, i) => _ResultTile(result: results[i]),
+      body: async.when(
+        data: (results) => RefreshIndicator(
+          onRefresh: () async => ref.invalidate(resultsProvider),
+          child: ListView.separated(
+            padding: const EdgeInsets.all(20),
+            itemCount: results.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (_, i) => _ResultTile(result: results[i]),
+          ),
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.cloud_off_outlined,
+                  size: 48,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  e.toString(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => ref.invalidate(resultsProvider),
+                  child: const Text('Tentar novamente'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
