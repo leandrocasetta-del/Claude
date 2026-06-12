@@ -26,8 +26,6 @@ class ExamDetailScreen extends StatelessWidget {
         children: const [
           _Header(),
           SizedBox(height: 12),
-          _FictionalNotice(),
-          SizedBox(height: 12),
           _PatientCard(),
           SizedBox(height: 12),
           _ClinicalIndicationCard(),
@@ -51,6 +49,8 @@ class ExamDetailScreen extends StatelessWidget {
           _EpsSection(),
           SizedBox(height: 12),
           _DiagnosticSummaryCard(),
+          SizedBox(height: 16),
+          _FictionalNotice(),
         ],
       ),
     );
@@ -181,12 +181,12 @@ class _PatientCard extends StatelessWidget {
           ),
           _KeyValueRow(
             left: _KV('Nascimento', '11/04/1983'),
-            right: _KV('Convenio', 'Particular'),
+            right: _KV('Convenio', 'Bradesco Empresas'),
           ),
           SizedBox(height: 8),
-          _KV('Medico solicitante', 'Dr. R. Almeida - CRM/SP 000.000'),
+          _KV('Medico solicitante', 'Dr. Ricardo Casalino - CRM/SP 04641'),
           SizedBox(height: 4),
-          _KV('Resp. tecnico', 'Dr. C. Tanaka - CRM/SP 000.000 / RQE Cardiologia'),
+          _KV('Resp. tecnico', 'Dr. C. Tanaka - CRM/SP 05433-8 / RQE Cardiologia'),
         ],
       ),
     );
