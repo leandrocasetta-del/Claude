@@ -40,15 +40,17 @@ jobs:
 
       - name: Patch Kotlin and compileSdk
         run: |
-          SETTINGS=android/settings.gradle
-          sed -i -E 's/id "org\.jetbrains\.kotlin\.android" version "[^"]+"/id "org.jetbrains.kotlin.android" version "1.9.22"/' "$SETTINGS"
-          cat "$SETTINGS"
+          SETTINGS=android/settings.gradle.kts
+          if [ ! -f "$SETTINGS" ]; then SETTINGS=android/settings.gradle; fi
+          echo "Editing $SETTINGS"
+          sed -i -E 's/(id\(?"org\.jetbrains\.kotlin\.android"\)?[[:space:]]+version[[:space:]]+")[^"]+"/\11.9.22"/' "$SETTINGS"
+          grep -E 'kotlin\.android' "$SETTINGS" || true
           BUILD_GRADLE=android/app/build.gradle.kts
           if [ ! -f "$BUILD_GRADLE" ]; then BUILD_GRADLE=android/app/build.gradle; fi
           echo "Editing $BUILD_GRADLE"
-          sed -i -E 's/compileSdk = flutter.compileSdkVersion/compileSdk = 35/' "$BUILD_GRADLE"
-          sed -i -E 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 35/' "$BUILD_GRADLE"
-          sed -i -E 's/compileSdk flutter.compileSdkVersion/compileSdk 35/' "$BUILD_GRADLE"
+          sed -i -E 's/compileSdk = flutter\.compileSdkVersion/compileSdk = 35/' "$BUILD_GRADLE"
+          sed -i -E 's/compileSdkVersion flutter\.compileSdkVersion/compileSdkVersion 35/' "$BUILD_GRADLE"
+          sed -i -E 's/compileSdk flutter\.compileSdkVersion/compileSdk 35/' "$BUILD_GRADLE"
           grep -E 'compileSdk' "$BUILD_GRADLE" || true
 
       - name: Patch AndroidManifest.xml
