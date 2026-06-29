@@ -1,0 +1,11 @@
+{
+  "appId": "com.curva.futebol",
+  "appName": "Curva",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#06121F"
+  }
+}

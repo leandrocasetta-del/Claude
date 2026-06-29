@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#06121F">
+<title>Curva: Futebol Arcade</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #06121F;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #fff; user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  #game { display: block; width: 100vw; height: 100vh; }
+  #overlay {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px;
+    background: radial-gradient(circle at 50% 35%, rgba(20,60,90,.55), rgba(6,18,31,.96));
+    text-align: center; padding: 24px; z-index: 10;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h1 { font-size: 13vw; font-weight: 800; letter-spacing: -1px; line-height: .95;
+    text-shadow: 0 4px 24px rgba(0,180,255,.4); }
+  #overlay h1 span { color: #2ee6a6; }
+  #overlay p { font-size: 4.2vw; max-width: 80vw; opacity: .85; line-height: 1.4; }
+  .btn {
+    margin-top: 8px; padding: 16px 42px; font-size: 5vw; font-weight: 700;
+    border: none; border-radius: 999px; color: #06121F;
+    background: linear-gradient(135deg, #2ee6a6, #29c2ff);
+    box-shadow: 0 8px 28px rgba(41,194,255,.45); cursor: pointer;
+  }
+  .btn:active { transform: translateY(2px); }
+  #bigscore { font-size: 10vw; font-weight: 800; color: #2ee6a6; }
+  .small { font-size: 3.4vw; opacity: .55; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="overlay">
+  <h1>CUR<span>VA</span></h1>
+  <p>Arraste para chutar. Faça uma curva no gesto e a bola curva no ar. Marque driblando a barreira e o goleiro.</p>
+  <button class="btn" id="startBtn">JOGAR</button>
+  <p class="small">Você tem 10 chutes. Quanto mais difícil o ângulo, mais pontos.</p>
+</div>
+
+<script>
+"use strict";
+(function () {
+  const cv = document.getElementById("game");
+  const ctx = cv.getContext("2d");
+  const overlay = document.getElementById("overlay");
+  const startBtn = document.getElementById("startBtn");
+
+  let W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // ---- Game state ----
+  const STATE = { READY: 0, AIMING: 1, FLYING: 2, RESOLVE: 3, OVER: 4 };
+  let state = STATE.READY;
+  let score = 0, shotsLeft = 10, streak = 0;
+  let msg = "", msgTimer = 0;
+
+  // Field geometry is computed relative to screen size each shot.
+  let goal, keeper, wall, ball;
+
+  function fieldY() { return H * 0.30; }          // y of goal line
+  function ballHomeY() { return H * 0.80; }       // ball rest position
+
+  function newShot() {
+    const gy = fieldY();
+    const goalW = Math.min(W * 0.62, 360);
+    goal = {
+      x: W / 2 - goalW / 2, y: gy,
+      w: goalW, h: H * 0.11
+    };
+    // Goalkeeper patrols the goal mouth.
+    keeper = {
+      x: W / 2, y: goal.y + goal.h * 0.55,
+      w: goalW * 0.20, h: goal.h * 0.75,
+      dir: Math.random() < .5 ? 1 : -1,
+      speed: 0.6 + Math.min(0.9, (10 - shotsLeft) * 0.09),
+      range: goalW * 0.34, dive: 0
+    };
+    // Defensive wall between ball and goal.
+    const wallY = gy + (ballHomeY() - gy) * 0.42;
+    const n = 3 + (Math.random() < 0.5 ? 0 : 1);
+    wall = [];
+    const spread = W * 0.30;
+    const cx = W / 2 + (Math.random() - 0.5) * W * 0.18;
+    for (let i = 0; i < n; i++) {
+      wall.push({
+        x: cx - spread / 2 + (spread / (n - 1)) * i,
+        y: wallY, w: W * 0.052, h: H * 0.085
+      });
+    }
+    ball = {
+      x: W / 2, y: ballHomeY(), r: Math.max(9, W * 0.026),
+      vx: 0, vy: 0, spin: 0, z: 0, vz: 0, moving: false
+    };
+    state = STATE.READY;
+  }
+
+  // ---- Input: swipe with curve detection ----
+  let pts = [];        // {x,y,t}
+  let tracking = false;
+
+  function localPoint(e) {
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX, y: t.clientY, t: performance.now() };
+  }
+
+  function onDown(e) {
+    if (state !== STATE.READY) return;
+    tracking = true; pts = [localPoint(e)];
+    state = STATE.AIMING;
+    e.preventDefault();
+  }
+  function onMove(e) {
+    if (!tracking) return;
+    pts.push(localPoint(e));
+    if (pts.length > 60) pts.shift();
+    e.preventDefault();
+  }
+  function onUp(e) {
+    if (!tracking) return;
+    tracking = false;
+    if (state !== STATE.AIMING) return;
+    launch();
+    e.preventDefault();
+  }
+
+  function launch() {
+    if (pts.length < 2) { state = STATE.READY; return; }
+    const a = pts[0], b = pts[pts.length - 1];
+    let dx = b.x - a.x, dy = b.y - a.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 24) { state = STATE.READY; return; }
+
+    // Power from swipe length, capped.
+    const power = Math.min(1, dist / (H * 0.55));
+    const speed = (5 + power * 11);
+
+    // Direction (must go upward toward goal).
+    let nx = dx / dist, ny = dy / dist;
+    if (ny > -0.15) ny = -0.15;           // ensure forward motion
+    const nrm = Math.hypot(nx, ny); nx /= nrm; ny /= nrm;
+
+    // Curve = lateral deviation of the swipe midpoint from the straight line.
+    let curve = 0;
+    const mid = pts[Math.floor(pts.length / 2)];
+    const t = ((mid.x - a.x) * dx + (mid.y - a.y) * dy) / (dist * dist);
+    const projx = a.x + dx * t, projy = a.y + dy * t;
+    const side = Math.sign((b.x - a.x) * (mid.y - a.y) - (b.y - a.y) * (mid.x - a.x));
+    const lateral = Math.hypot(mid.x - projx, mid.y - projy);
+    curve = side * Math.min(0.9, lateral / (W * 0.22));
+
+    ball.vx = nx * speed;
+    ball.vy = ny * speed;
+    ball.vz = 4.5 + power * 4;      // loft
+    ball.spin = curve * 0.9;
+    ball.moving = true;
+    ball.startX = ball.x;
+    state = STATE.FLYING;
+    msg = "";
+  }
+
+  cv.addEventListener("touchstart", onDown, { passive: false });
+  cv.addEventListener("touchmove", onMove, { passive: false });
+  cv.addEventListener("touchend", onUp, { passive: false });
+  cv.addEventListener("mousedown", onDown);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+
+  // ---- Physics update ----
+  function update() {
+    if (state === STATE.FLYING) {
+      // Magnus-style curve: spin pushes ball sideways, stronger as it flies.
+      ball.vx += ball.spin * 0.18;
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+      ball.vy *= 0.998;
+      // vertical (height) arc
+      ball.vz -= 0.32;
+      ball.z += ball.vz * 0.1;
+      if (ball.z < 0) ball.z = 0;
+
+      // Keeper AI
+      keeper.x += keeper.dir * keeper.speed;
+      if (keeper.x > W / 2 + keeper.range) keeper.dir = -1;
+      if (keeper.x < W / 2 - keeper.range) keeper.dir = 1;
+      // dive toward ball as it nears the line
+      if (ball.y < goal.y + goal.h * 1.4) {
+        keeper.x += (ball.x - keeper.x) * 0.04;
+      }
+
+      checkCollisions();
+
+      // Off screen / past goal without scoring
+      if (ball.y < -40 || ball.x < -40 || ball.x > W + 40) {
+        resolveShot(false, "FORA!");
+      }
+    } else if (state === STATE.RESOLVE) {
+      msgTimer--;
+      if (msgTimer <= 0) {
+        if (shotsLeft <= 0) { state = STATE.OVER; showGameOver(); }
+        else newShot();
+      }
+    }
+  }
+
+  function ballOnGround() { return ball.z < goal.h * 1.2; }
+
+  function checkCollisions() {
+    // Wall block (only when ball is low — a flat shot). A lofted ball clears it.
+    if (ball.z < wall[0].h * 0.9) {
+      for (const p of wall) {
+        if (ball.x > p.x - p.w / 2 && ball.x < p.x + p.w / 2 &&
+            ball.y > p.y - p.h / 2 && ball.y < p.y + p.h / 2) {
+          ball.vy *= -0.4; ball.vx *= 0.3; ball.spin = 0;
+          resolveShot(false, "BARREIRA!");
+          return;
+        }
+      }
+    }
+    // Reached goal line
+    if (ball.y <= goal.y + goal.h * 0.4) {
+      const inX = ball.x > goal.x && ball.x < goal.x + goal.w;
+      const inHeight = ball.z < goal.h * 2.2;       // under the crossbar
+      if (!inX || !inHeight) { return; } // let it sail; off-screen check handles miss
+      // Keeper save?
+      const kdx = Math.abs(ball.x - keeper.x);
+      if (kdx < keeper.w * 0.7 && ball.z < keeper.h * 1.1) {
+        resolveShot(false, "DEFENDEU!");
+        return;
+      }
+      // GOAL — score by difficulty (distance from keeper + curve used)
+      const diff = kdx / goal.w;
+      const curveBonus = Math.min(1, Math.abs(ball.spin) * 1.4);
+      const pts = Math.round(50 + diff * 100 + curveBonus * 80 + streak * 15);
+      resolveShot(true, "GOL! +" + pts, pts);
+    }
+  }
+
+  function resolveShot(scored, text, addPts) {
+    if (state === STATE.RESOLVE) return;
+    ball.moving = false;
+    shotsLeft--;
+    if (scored) { score += (addPts || 50); streak++; }
+    else streak = 0;
+    msg = text; msgTimer = 70;
+    state = STATE.RESOLVE;
+  }
+
+  // ---- Rendering ----
+  function drawField() {
+    ctx.fillStyle = "#0a2c1a";
+    ctx.fillRect(0, 0, W, H);
+    // grass stripes
+    for (let i = 0; i < 14; i++) {
+      ctx.fillStyle = i % 2 ? "rgba(255,255,255,.025)" : "rgba(0,0,0,.06)";
+      ctx.fillRect(0, fieldY() + i * (H / 14), W, H / 14);
+    }
+    // penalty arc
+    ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(W / 2, fieldY() + H * 0.14, W * 0.34, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+  }
+
+  function drawGoal() {
+    ctx.save();
+    ctx.strokeStyle = "#eef6ff"; ctx.lineWidth = 6; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(goal.x, goal.y + goal.h);
+    ctx.lineTo(goal.x, goal.y);
+    ctx.lineTo(goal.x + goal.w, goal.y);
+    ctx.lineTo(goal.x + goal.w, goal.y + goal.h);
+    ctx.stroke();
+    // net
+    ctx.strokeStyle = "rgba(255,255,255,.18)"; ctx.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) {
+      const x = goal.x + (goal.w / 10) * i;
+      ctx.beginPath(); ctx.moveTo(x, goal.y); ctx.lineTo(x, goal.y + goal.h); ctx.stroke();
+    }
+    for (let j = 0; j <= 5; j++) {
+      const y = goal.y + (goal.h / 5) * j;
+      ctx.beginPath(); ctx.moveTo(goal.x, y); ctx.lineTo(goal.x + goal.w, y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawKeeper() {
+    ctx.save();
+    ctx.translate(keeper.x, keeper.y);
+    ctx.fillStyle = "#ffcf3a";
+    roundRect(-keeper.w / 2, -keeper.h / 2, keeper.w, keeper.h, 6);
+    ctx.fill();
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath(); ctx.arc(0, -keeper.h / 2 - 6, keeper.w * 0.28, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawWall() {
+    for (const p of wall) {
+      ctx.fillStyle = "#d83a4a";
+      roundRect(p.x - p.w / 2, p.y - p.h / 2, p.w, p.h, 5); ctx.fill();
+      ctx.fillStyle = "#1a1a1a";
+      ctx.beginPath(); ctx.arc(p.x, p.y - p.h / 2 - 4, p.w * 0.3, 0, 7); ctx.fill();
+    }
+  }
+
+  function drawBall() {
+    const lift = ball.z;                 // visual height
+    const sx = ball.x, sy = ball.y - lift;
+    // shadow
+    ctx.fillStyle = "rgba(0,0,0,.30)";
+    ctx.beginPath();
+    ctx.ellipse(ball.x, ball.y, ball.r * (1 + lift * 0.01), ball.r * 0.5, 0, 0, 7);
+    ctx.fill();
+    // ball
+    const g = ctx.createRadialGradient(sx - ball.r*.3, sy - ball.r*.3, ball.r*.1, sx, sy, ball.r);
+    g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#c7d2dc");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(sx, sy, ball.r, 0, 7); ctx.fill();
+    ctx.fillStyle = "#1d2733";
+    ctx.beginPath(); ctx.arc(sx, sy, ball.r * 0.32, 0, 7); ctx.fill();
+  }
+
+  function drawAimTrail() {
+    if (state !== STATE.AIMING || pts.length < 2) return;
+    ctx.strokeStyle = "rgba(46,230,166,.9)"; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+    const b = pts[pts.length - 1];
+    ctx.fillStyle = "rgba(46,230,166,.95)";
+    ctx.beginPath(); ctx.arc(b.x, b.y, 8, 0, 7); ctx.fill();
+  }
+
+  function drawHUD() {
+    ctx.fillStyle = "#fff"; ctx.textAlign = "left";
+    ctx.font = "700 " + Math.round(W * 0.06) + "px sans-serif";
+    ctx.fillText(score.toString(), 18, W * 0.085);
+    ctx.font = "600 " + Math.round(W * 0.035) + "px sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,.6)";
+    ctx.fillText("PONTOS", 18, W * 0.13);
+    // shots
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 " + Math.round(W * 0.05) + "px sans-serif";
+    ctx.fillText("⚽ " + shotsLeft, W - 18, W * 0.08);
+    if (streak > 1) {
+      ctx.fillStyle = "#ffcf3a";
+      ctx.font = "700 " + Math.round(W * 0.04) + "px sans-serif";
+      ctx.fillText("🔥 x" + streak, W - 18, W * 0.135);
+    }
+    ctx.textAlign = "center";
+    if (msg && msgTimer > 0) {
+      ctx.fillStyle = msg.startsWith("GOL") ? "#2ee6a6" : "#ff6b6b";
+      ctx.font = "800 " + Math.round(W * 0.085) + "px sans-serif";
+      ctx.fillText(msg, W / 2, H * 0.5);
+    }
+    if (state === STATE.READY) {
+      ctx.fillStyle = "rgba(255,255,255,.55)";
+      ctx.font = "600 " + Math.round(W * 0.038) + "px sans-serif";
+      ctx.fillText("arraste para chutar →  faça curva no gesto", W / 2, H * 0.93);
+    }
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function render() {
+    drawField();
+    drawGoal();
+    drawKeeper();
+    drawWall();
+    drawBall();
+    drawAimTrail();
+    drawHUD();
+  }
+
+  function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // ---- Flow ----
+  function startGame() {
+    score = 0; shotsLeft = 10; streak = 0; msg = "";
+    overlay.classList.add("hidden");
+    newShot();
+  }
+
+  function showGameOver() {
+    overlay.classList.remove("hidden");
+    overlay.innerHTML =
+      '<h1>FIM</h1>' +
+      '<div id="bigscore">' + score + ' pontos</div>' +
+      '<p>10 chutes. ' + (score >= 600 ? "Craque da curva! 🐐" : score >= 300 ? "Bom de bola! ⚽" : "Treine a curva e volte. 💪") + '</p>' +
+      '<button class="btn" id="againBtn">JOGAR DE NOVO</button>';
+    document.getElementById("againBtn").addEventListener("click", startGame);
+  }
+
+  startBtn.addEventListener("click", startGame);
+  loop();
+})();
+</script>
+</body>
+</html>

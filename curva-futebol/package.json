@@ -1,0 +1,19 @@
+{
+  "name": "curva-futebol",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Curva: Futebol Arcade — jogo de futebol com chute em curva por swipe (Capacitor/Android).",
+  "scripts": {
+    "add:android": "cap add android",
+    "sync": "cap sync",
+    "open:android": "cap open android",
+    "copy": "cap copy"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}
