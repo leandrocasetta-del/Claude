@@ -1,0 +1,147 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - claude/cool-newton-nvfa1g
+    paths:
+      - 'diagnosticos_app/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: diagnosticos_app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+          channel: stable
+          cache: true
+
+      - name: Generate native Android structure
+        run: flutter create --project-name diagnosticos_app --platforms android .
+
+      - name: Patch Kotlin, compileSdk and NDK version
+        run: |
+          SETTINGS=android/settings.gradle.kts
+          if [ ! -f "$SETTINGS" ]; then SETTINGS=android/settings.gradle; fi
+          echo "Editing $SETTINGS"
+          sed -i -E 's/(id\(?"org\.jetbrains\.kotlin\.android"\)?[[:space:]]+version[[:space:]]+")[^"]+"/\11.9.22"/' "$SETTINGS"
+          grep -E 'kotlin\.android' "$SETTINGS" || true
+          BUILD_GRADLE=android/app/build.gradle.kts
+          if [ ! -f "$BUILD_GRADLE" ]; then BUILD_GRADLE=android/app/build.gradle; fi
+          echo "Editing $BUILD_GRADLE"
+          python3 <<PY
+          path = "$BUILD_GRADLE"
+          with open(path) as f:
+              content = f.read()
+          import re
+          # Set compileSdk to 35
+          content = re.sub(r'compileSdk\s*=\s*flutter\.compileSdkVersion', 'compileSdk = 35', content)
+          content = re.sub(r'compileSdk\s+flutter\.compileSdkVersion', 'compileSdk 35', content)
+          # Set/replace ndkVersion to 27.0.12077973
+          if 'ndkVersion' in content:
+              content = re.sub(r'ndkVersion\s*=\s*[^\n]+', 'ndkVersion = "27.0.12077973"', content)
+              content = re.sub(r'ndkVersion\s+[^\n]+', 'ndkVersion = "27.0.12077973"', content)
+          else:
+              content = re.sub(r'(compileSdk\s*=\s*35)', r'\1\n    ndkVersion = "27.0.12077973"', content, count=1)
+          with open(path, 'w') as f:
+              f.write(content)
+          print(content)
+          PY
+
+      - name: Patch AndroidManifest.xml
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          python3 <<'PY'
+          import re
+          path = 'android/app/src/main/AndroidManifest.xml'
+          with open(path) as f:
+              content = f.read()
+          perms = '''
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+              <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+              <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+          '''
+          if 'USE_BIOMETRIC' not in content:
+              content = content.replace('<application', perms + '\n    <application', 1)
+          content = content.replace(
+              'android:usesCleartextTraffic="false"',
+              'android:usesCleartextTraffic="true"'
+          )
+          if 'usesCleartextTraffic' not in content:
+              content = content.replace(
+                  '<application',
+                  '<application android:usesCleartextTraffic="true"',
+                  1
+              )
+          with open(path, 'w') as f:
+              f.write(content)
+          PY
+          cat $MANIFEST
+
+      - name: Patch MainActivity to FlutterFragmentActivity
+        run: |
+          MAIN=$(find android/app/src/main -name 'MainActivity.kt' | head -1)
+          if [ -n "$MAIN" ]; then
+            sed -i 's/import io.flutter.embedding.android.FlutterActivity/import io.flutter.embedding.android.FlutterFragmentActivity/' "$MAIN"
+            sed -i 's/: FlutterActivity()/: FlutterFragmentActivity()/' "$MAIN"
+            cat "$MAIN"
+          fi
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Rename APK
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             build/app/outputs/flutter-apk/hcor-app.apk
+          ls -lh build/app/outputs/flutter-apk/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hcor-app
+          path: diagnosticos_app/build/app/outputs/flutter-apk/hcor-app.apk
+          retention-days: 30
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Hcor App APK (latest build)
+          body: |
+            APK Android do app Hcor (estudo de UI/UX).
+
+            **Como instalar:**
+            1. Baixe o arquivo `hcor-app.apk` abaixo
+            2. Abra no celular (permita "fontes desconhecidas")
+            3. Login: CPF `32843725801` / Senha `Rinmueck45@`
+
+            Build do commit: ${{ github.sha }}
+          files: diagnosticos_app/build/app/outputs/flutter-apk/hcor-app.apk
+          prerelease: false
+          make_latest: 'true'
