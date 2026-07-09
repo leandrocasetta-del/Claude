@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Segundo Cérebro</string>
+    <string name="widget_description">Tarefas pendentes e sequência do diário, direto na tela inicial.</string>
+</resources>
