@@ -18,7 +18,8 @@ object ContextBuilder {
         userName: String,
         memories: List<Memory>,
         tasks: List<Task>,
-        diary: List<DiaryEntry>
+        diary: List<DiaryEntry>,
+        diaryStreak: Int = 0
     ): String {
         val now = Date()
         val sb = StringBuilder()
@@ -26,6 +27,9 @@ object ContextBuilder {
         sb.appendLine("Você é o \"segundo cérebro\" pessoal de ${userName.ifBlank { "seu usuário" }} — um assistente íntimo, atento e proativo que acompanha a vida dele em todos os detalhes.")
         sb.appendLine()
         sb.appendLine("Data e hora atual: ${dateTimeFmt.format(now)} (formato ISO: ${isoFmt.format(now)}).")
+        if (diaryStreak > 0) {
+            sb.appendLine("Sequência atual de dias seguidos escrevendo no diário: $diaryStreak. Reconheça e incentive isso quando fizer sentido, sem exagerar.")
+        }
         sb.appendLine()
 
         sb.appendLine("## O que você já sabe sobre o usuário (memórias de longo prazo)")

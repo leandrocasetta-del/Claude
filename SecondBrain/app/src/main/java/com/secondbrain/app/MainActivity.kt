@@ -9,36 +9,30 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.ContextCompat
 import com.secondbrain.app.ui.ChatScreen
 import com.secondbrain.app.ui.DiaryScreen
 import com.secondbrain.app.ui.MemoryScreen
+import com.secondbrain.app.ui.SecondBrainTheme
 import com.secondbrain.app.ui.SettingsScreen
 import com.secondbrain.app.ui.TasksScreen
 
@@ -56,24 +50,19 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
-fun SecondBrainTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val colorScheme = when {
-        Build.VERSION.SDK_INT >= 31 && dark -> dynamicDarkColorScheme(context)
-        Build.VERSION.SDK_INT >= 31 -> dynamicLightColorScheme(context)
-        dark -> darkColorScheme()
-        else -> lightColorScheme()
-    }
-    MaterialTheme(colorScheme = colorScheme, content = content)
-}
-
 private data class Tab(val label: String, val icon: ImageVector)
+
+private val tabs = listOf(
+    Tab("Chat", Icons.Filled.Email),
+    Tab("Tarefas", Icons.AutoMirrored.Filled.List),
+    Tab("Diário", Icons.Filled.Create),
+    Tab("Memória", Icons.Filled.Favorite),
+    Tab("Ajustes", Icons.Filled.Settings)
+)
 
 @Composable
 fun SecondBrainApp(viewModel: AppViewModel) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
     // Pede permissão de notificação (Android 13+) na primeira abertura
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -87,14 +76,6 @@ fun SecondBrainApp(viewModel: AppViewModel) {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-
-    val tabs = listOf(
-        Tab("Chat", Icons.Filled.Email),
-        Tab("Tarefas", Icons.AutoMirrored.Filled.List),
-        Tab("Diário", Icons.Filled.Create),
-        Tab("Memória", Icons.Filled.Favorite),
-        Tab("Ajustes", Icons.Filled.Settings)
-    )
 
     Scaffold(
         bottomBar = {

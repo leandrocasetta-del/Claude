@@ -10,8 +10,10 @@ import com.secondbrain.app.data.Repository
 import com.secondbrain.app.data.Settings
 import com.secondbrain.app.notify.Reminders
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.time.LocalDateTime
@@ -20,6 +22,15 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
+
+    companion object {
+        /** Limite de caracteres por mensagem para evitar custo/latência desproporcionais. */
+        const val MAX_MESSAGE_CHARS = 4000
+
+        /** Orçamento aproximado de caracteres de histórico enviado por chamada. */
+        private const val HISTORY_CHAR_BUDGET = 16000
+        private const val HISTORY_MAX_TURNS = 40
+    }
 
     val repository = Repository(application)
     val settings = Settings(application)
@@ -32,8 +43,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _autoSpeak = MutableStateFlow(settings.autoSpeak)
     val autoSpeak: StateFlow<Boolean> = _autoSpeak
 
+    private val _isSpeaking = MutableStateFlow(false)
+    val isSpeaking: StateFlow<Boolean> = _isSpeaking
+
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+    private var currentJob: Job? = null
 
     init {
         Reminders.createChannel(application)
@@ -41,6 +56,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         tts = TextToSpeech(application) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.language = Locale("pt", "BR")
+                tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) { _isSpeaking.value = true }
+                    override fun onDone(utteranceId: String?) { _isSpeaking.value = false }
+                    override fun onError(utteranceId: String?) { _isSpeaking.value = false }
+                })
                 ttsReady = true
             }
         }
@@ -56,14 +76,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val newValue = !_autoSpeak.value
         _autoSpeak.value = newValue
         settings.autoSpeak = newValue
-        if (!newValue) tts?.stop()
+        if (!newValue) stopSpeaking()
     }
 
-    fun sendMessage(text: String) {
-        val trimmed = text.trim()
+    /**
+     * Envia uma mensagem ao Claude.
+     * @param displayText texto opcional mostrado na bolha do usuário no lugar de [text]
+     *   (usado por atalhos como "resumo da semana", que enviam um prompt mais longo).
+     */
+    fun sendMessage(text: String, displayText: String? = null) {
+        val trimmed = text.trim().take(MAX_MESSAGE_CHARS)
         if (trimmed.isEmpty() || _isThinking.value) return
 
-        repository.addChatMessage("user", trimmed)
+        repository.addChatMessage("user", displayText ?: trimmed)
 
         if (settings.apiKey.isBlank()) {
             repository.addChatMessage(
@@ -74,33 +99,77 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _isThinking.value = true
-        viewModelScope.launch(Dispatchers.IO) {
+        currentJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val system = ContextBuilder.build(
                     userName = settings.userName,
                     memories = repository.memories.value,
                     tasks = repository.tasks.value,
-                    diary = repository.diary.value
+                    diary = repository.diary.value,
+                    diaryStreak = repository.diaryStreakDays()
                 )
-                val reply = claude.chat(system, buildHistory(), ::executeTool)
+                val reply = claude.chat(
+                    system = system,
+                    history = buildHistory(trimmed, displayText),
+                    executeTool = ::executeTool,
+                    isCancelled = { !isActive }
+                )
                 repository.addChatMessage("assistant", reply)
                 if (_autoSpeak.value) speak(reply)
             } catch (e: Exception) {
-                repository.addChatMessage("assistant", "⚠️ Não consegui responder: ${e.message}")
+                if (isActive) {
+                    repository.addChatMessage("assistant", "⚠️ Não consegui responder: ${e.message ?: "erro desconhecido"}")
+                }
             } finally {
                 _isThinking.value = false
             }
         }
     }
 
+    /** Envia um pedido de resumo da semana, mostrando um rótulo curto na bolha do usuário. */
+    fun requestWeeklySummary() {
+        sendMessage(
+            text = "Faça um resumo carinhoso e perspicaz da minha última semana com base nas minhas tarefas, entradas de diário e memórias. Aponte um padrão que você notou e sugira algo gentil e concreto para os próximos dias. No máximo 6 frases.",
+            displayText = "📊 Resumo da semana"
+        )
+    }
+
+    /** Cancela a resposta em andamento (o usuário tocou em "parar"). */
+    fun cancelThinking() {
+        currentJob?.cancel()
+        _isThinking.value = false
+    }
+
+    fun deleteChatMessage(id: String) = repository.deleteChatMessage(id)
+
     /** Histórico para a API: turnos de texto, começando com uma mensagem do usuário. */
-    private fun buildHistory(): List<Pair<String, String>> {
+    private fun buildHistory(pendingUserText: String, pendingDisplayText: String?): List<Pair<String, String>> {
+        // A mensagem que acabou de ser adicionada ao repositório pode ter um rótulo de exibição
+        // diferente do texto real enviado à IA (ex.: "📊 Resumo da semana"); usamos o texto real aqui.
         val all = repository.chat.value
             .filter { it.role == "user" || it.role == "assistant" }
-            .takeLast(40)
+            .takeLast(HISTORY_MAX_TURNS)
+            .toMutableList()
+        if (all.isNotEmpty() && pendingDisplayText != null && all.last().text == pendingDisplayText) {
+            all[all.size - 1] = all.last().copy(text = pendingUserText)
+        }
+
         val firstUser = all.indexOfFirst { it.role == "user" }
         if (firstUser < 0) return emptyList()
-        return all.drop(firstUser).map { it.role to it.text }
+        val trimmedList = all.subList(firstUser, all.size)
+
+        // Orçamento aproximado de caracteres: descarta turnos mais antigos se o histórico
+        // crescer demais, mantendo sempre o primeiro turno como "user".
+        var totalChars = trimmedList.sumOf { it.text.length }
+        var start = 0
+        while (totalChars > HISTORY_CHAR_BUDGET && start < trimmedList.size - 2) {
+            totalChars -= trimmedList[start].text.length
+            start++
+        }
+        // garante que ainda comece com "user" após o corte
+        while (start < trimmedList.size && trimmedList[start].role != "user") start++
+
+        return trimmedList.drop(start).map { it.role to it.text }
     }
 
     private fun executeTool(name: String, input: JSONObject): String = when (name) {
@@ -157,28 +226,74 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         else -> "Ferramenta desconhecida: $name"
     }
 
-    private fun parseLocalDateTime(raw: String): Long? = try {
-        val normalized = raw.trim().take(16) // aceita "2026-07-10T09:00:00" cortando os segundos
-        val local = LocalDateTime.parse(normalized, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-        local.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-    } catch (e: Exception) {
-        null
+    private val isoFormatters = listOf(
+        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"),
+        DateTimeFormatter.ISO_LOCAL_DATE_TIME
+    )
+
+    /** Interpreta datas ISO com tolerância a segundos extras e a horas/minutos sem zero à esquerda. */
+    private fun parseLocalDateTime(raw: String): Long? {
+        val trimmed = raw.trim()
+        val candidates = if (trimmed.length > 16) listOf(trimmed, trimmed.take(16)) else listOf(trimmed)
+
+        for (candidate in candidates) {
+            for (formatter in isoFormatters) {
+                try {
+                    val local = LocalDateTime.parse(candidate, formatter)
+                    return local.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                } catch (e: Exception) {
+                    // tenta o próximo formato
+                }
+            }
+        }
+
+        // Último recurso: extrai os componentes manualmente, tolerando "2026-7-9T9:5"
+        val match = Regex("""(\d{4})-(\d{1,2})-(\d{1,2})[T ](\d{1,2}):(\d{1,2})""").find(trimmed) ?: return null
+        return try {
+            val (y, mo, d, h, mi) = match.destructured
+            val local = LocalDateTime.of(y.toInt(), mo.toInt(), d.toInt(), h.toInt(), mi.toInt())
+            local.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        } catch (e: Exception) {
+            null
+        }
     }
 
     fun speak(text: String) {
         if (!ttsReady) return
-        // remove emojis/símbolos que soam mal no TTS
-        val clean = text.replace(Regex("[\\p{So}\\p{Cn}]"), "").trim()
+        val clean = stripForSpeech(text)
         if (clean.isNotEmpty()) {
             tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "reply")
         }
     }
 
+    /**
+     * Remove emojis e símbolos que soam mal no TTS, operando por code point
+     * (evita corromper pares substitutos de emojis de 4 bytes como 🧠 ou 📊).
+     */
+    private fun stripForSpeech(text: String): String {
+        val sb = StringBuilder(text.length)
+        var i = 0
+        while (i < text.length) {
+            val codePoint = text.codePointAt(i)
+            val charCount = Character.charCount(codePoint)
+            val isSymbol = codePoint in 0x1F000..0x1FFFF || // emojis suplementares
+                codePoint in 0x2190..0x2BFF || // setas e símbolos diversos
+                codePoint in 0x2600..0x27BF || // símbolos/dingbats diversos
+                codePoint == 0xFE0F || // seletor de variação (emoji vs texto)
+                codePoint == 0x200D // zero-width joiner
+            if (!isSymbol) sb.appendCodePoint(codePoint)
+            i += charCount
+        }
+        return sb.toString().replace(Regex("[ \\t]{2,}"), " ").trim()
+    }
+
     fun stopSpeaking() {
         tts?.stop()
+        _isSpeaking.value = false
     }
 
     override fun onCleared() {
+        currentJob?.cancel()
         tts?.shutdown()
         super.onCleared()
     }

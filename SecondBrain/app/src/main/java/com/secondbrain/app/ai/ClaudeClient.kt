@@ -20,6 +20,8 @@ class ClaudeClient(private val apiKeyProvider: () -> String) {
         const val MODEL = "claude-opus-4-8"
         private const val API_URL = "https://api.anthropic.com/v1/messages"
         private const val MAX_TOOL_ROUNDS = 12
+        private const val MAX_RETRIES = 2
+        private val RETRY_DELAYS_MS = longArrayOf(800, 2400)
     }
 
     private val http = OkHttpClient.Builder()
@@ -30,17 +32,22 @@ class ClaudeClient(private val apiKeyProvider: () -> String) {
 
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
 
+    /** Erro amigável e classificado, para a UI decidir como reagir. */
+    class ApiException(message: String, val retryable: Boolean = false) : IOException(message)
+
     /**
      * Envia a conversa e resolve chamadas de ferramenta até obter a resposta final.
      *
      * @param system prompt de sistema com o contexto da vida do usuário
      * @param history pares (role, texto) da conversa, começando com "user"
      * @param executeTool executa uma ferramenta localmente e retorna o resultado como texto
+     * @param isCancelled checagem cooperativa de cancelamento entre rodadas de ferramentas
      */
     fun chat(
         system: String,
         history: List<Pair<String, String>>,
-        executeTool: (name: String, input: JSONObject) -> String
+        executeTool: (name: String, input: JSONObject) -> String,
+        isCancelled: () -> Boolean = { false }
     ): String {
         val messages = JSONArray()
         history.forEach { (role, text) ->
@@ -49,6 +56,7 @@ class ClaudeClient(private val apiKeyProvider: () -> String) {
 
         var rounds = 0
         while (true) {
+            if (isCancelled()) throw IOException("Cancelado")
             val response = send(system, messages)
             val content = response.getJSONArray("content")
             val stopReason = response.optString("stop_reason")
@@ -103,12 +111,24 @@ class ClaudeClient(private val apiKeyProvider: () -> String) {
 
     private fun send(system: String, messages: JSONArray): JSONObject {
         val apiKey = apiKeyProvider()
-        if (apiKey.isBlank()) throw IOException("Chave de API não configurada. Vá em Ajustes.")
+        if (apiKey.isBlank()) {
+            throw ApiException("Chave de API não configurada. Vá em Ajustes e cole sua chave.")
+        }
+
+        // System como bloco de texto com cache_control: turnos consecutivos do mesmo
+        // loop de ferramentas (e conversas onde o contexto não mudou) reaproveitam o
+        // prefixo cacheado, reduzindo custo e latência.
+        val systemBlocks = JSONArray().put(
+            JSONObject()
+                .put("type", "text")
+                .put("text", system)
+                .put("cache_control", JSONObject().put("type", "ephemeral"))
+        )
 
         val body = JSONObject()
             .put("model", MODEL)
             .put("max_tokens", 8192)
-            .put("system", system)
+            .put("system", systemBlocks)
             .put("thinking", JSONObject().put("type", "adaptive"))
             .put("messages", messages)
             .put("tools", Tools.definitions())
@@ -120,17 +140,58 @@ class ClaudeClient(private val apiKeyProvider: () -> String) {
             .post(body.toString().toRequestBody(jsonMedia))
             .build()
 
-        http.newCall(request).execute().use { resp ->
-            val text = resp.body?.string() ?: ""
-            if (!resp.isSuccessful) {
-                val message = try {
-                    JSONObject(text).getJSONObject("error").getString("message")
-                } catch (e: Exception) {
-                    "HTTP ${resp.code}"
+        var lastError: Exception? = null
+        for (attempt in 0..MAX_RETRIES) {
+            try {
+                http.newCall(request).execute().use { resp ->
+                    val text = resp.body?.string() ?: ""
+                    if (resp.isSuccessful) return JSONObject(text)
+
+                    val apiMessage = try {
+                        JSONObject(text).getJSONObject("error").getString("message")
+                    } catch (e: Exception) {
+                        null
+                    }
+
+                    when (resp.code) {
+                        401, 403 -> throw ApiException(
+                            "Chave de API inválida ou sem permissão. Confira em Ajustes."
+                        )
+                        429 -> {
+                            if (attempt < MAX_RETRIES) {
+                                Thread.sleep(RETRY_DELAYS_MS[attempt])
+                                return@use
+                            }
+                            throw ApiException(
+                                "Muitas mensagens em pouco tempo. Espere alguns segundos e tente de novo.",
+                                retryable = true
+                            )
+                        }
+                        in 500..599 -> {
+                            if (attempt < MAX_RETRIES) {
+                                Thread.sleep(RETRY_DELAYS_MS[attempt])
+                                return@use
+                            }
+                            throw ApiException(
+                                "O servidor da Anthropic está instável agora. Tente de novo em instantes.",
+                                retryable = true
+                            )
+                        }
+                        else -> throw ApiException(apiMessage ?: "Erro inesperado (HTTP ${resp.code}).")
+                    }
                 }
-                throw IOException(message)
+                // Se chegou aqui é porque um retry foi agendado (return@use acima); continua o loop.
+            } catch (e: ApiException) {
+                throw e
+            } catch (e: IOException) {
+                lastError = e
+                if (attempt < MAX_RETRIES) {
+                    Thread.sleep(RETRY_DELAYS_MS[attempt])
+                } else {
+                    throw ApiException("Sem conexão com a internet. Verifique sua rede.", retryable = true)
+                }
             }
-            return JSONObject(text)
         }
+        throw lastError ?: ApiException("Falha desconhecida ao contatar a IA.")
     }
 }

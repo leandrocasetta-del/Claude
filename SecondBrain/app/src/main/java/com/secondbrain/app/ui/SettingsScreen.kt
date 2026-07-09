@@ -1,6 +1,10 @@
 package com.secondbrain.app.ui
 
+import android.net.Uri
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +36,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.secondbrain.app.AppViewModel
 import com.secondbrain.app.ai.ClaudeClient
+import com.secondbrain.app.notify.Reminders
+import java.io.OutputStreamWriter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,6 +46,21 @@ fun SettingsScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
     var apiKey by remember { mutableStateOf(viewModel.settings.apiKey) }
     var userName by remember { mutableStateOf(viewModel.settings.userName) }
     val autoSpeak by viewModel.autoSpeak.collectAsState()
+    var exactAlarmGranted by remember { mutableStateOf(Reminders.canScheduleExact(context)) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        try {
+            context.contentResolver.openOutputStream(uri)?.use { stream ->
+                OutputStreamWriter(stream).use { it.write(viewModel.repository.exportAsText()) }
+            }
+            Toast.makeText(context, "Dados exportados!", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(context, "Não consegui exportar: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
 
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)
@@ -97,7 +118,38 @@ fun SettingsScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
+            Text("Lembretes", style = MaterialTheme.typography.titleMedium)
+            if (Build.VERSION.SDK_INT >= 31 && !exactAlarmGranted) {
+                Text(
+                    "Sem a permissão de alarme exato, os lembretes podem chegar com alguns minutos de atraso.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                Spacer(Modifier.height(4.dp))
+                OutlinedButton(onClick = {
+                    Reminders.openExactAlarmSettings(context)
+                    exactAlarmGranted = Reminders.canScheduleExact(context)
+                }) {
+                    Text("Permitir alarmes exatos")
+                }
+            } else {
+                Text(
+                    "Lembretes vão disparar mesmo se o app for reiniciado ou o celular reiniciar.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+
             Text("Dados", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = {
+                exportLauncher.launch("segundo-cerebro-backup.txt")
+            }) {
+                Text("Exportar meus dados")
+            }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = {
                 viewModel.repository.clearChat()
