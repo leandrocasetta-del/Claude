@@ -61,8 +61,8 @@ fun MoodTrendChart(entries: List<DiaryEntry>, modifier: Modifier = Modifier) {
                 val x = index * barWidth + gap / 2
                 val w = barWidth - gap
                 if (avg != null) {
-                    val fraction = (avg - 1) / 4f // 0..1
-                    val barHeight = (size.height * (0.25f + 0.75f * fraction.coerceIn(0f, 1f)))
+                    val fraction = ((avg - 1) / 4.0).toFloat().coerceIn(0f, 1f) // 0..1
+                    val barHeight = size.height * (0.25f + 0.75f * fraction)
                     val colorIndex = Math.round(avg).toInt().coerceIn(1, 5) - 1
                     drawRoundRect(
                         color = moodColors[colorIndex],
