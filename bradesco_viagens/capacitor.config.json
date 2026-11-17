@@ -1,0 +1,7 @@
+{
+  "appId": "br.com.bradesco.privatebank.viagens",
+  "appName": "Viagens BPB",
+  "webDir": "www",
+  "backgroundColor": "#CC092F",
+  "android": { "allowMixedContent": false }
+}

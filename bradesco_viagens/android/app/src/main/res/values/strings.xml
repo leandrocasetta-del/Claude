@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Viagens BPB</string>
+    <string name="title_activity_main">Viagens BPB</string>
+    <string name="package_name">br.com.bradesco.privatebank.viagens</string>
+    <string name="custom_url_scheme">br.com.bradesco.privatebank.viagens</string>
+</resources>
