@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 64" role="img" aria-label="Bradesco Private Bank (placeholder)">
+  <g fill="none" stroke="#CC092F" stroke-width="5" stroke-linecap="round">
+    <path d="M6 44 Q24 6 42 44"/><path d="M24 44 V58"/>
+  </g>
+  <text x="56" y="34" font-family="Georgia,serif" font-size="28" font-weight="700" fill="#CC092F">Bradesco</text>
+  <text x="57" y="55" font-family="Georgia,serif" font-size="15" letter-spacing="3" fill="#5b5b5b">PRIVATE BANK</text>
+</svg>

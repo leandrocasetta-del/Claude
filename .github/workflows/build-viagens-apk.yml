@@ -1,0 +1,22 @@
+name: Build Viagens BPB APK
+on:
+  workflow_dispatch:
+  push:
+    paths: ['bradesco_viagens/**']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: bradesco_viagens } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - run: npm ci
+      - run: npx cap sync android
+      - run: cd android && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: viagens-bpb-debug-apk
+          path: bradesco_viagens/android/app/build/outputs/apk/debug/app-debug.apk
